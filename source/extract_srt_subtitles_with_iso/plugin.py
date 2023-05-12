@@ -171,7 +171,7 @@ class PluginStreamMapper(StreamMapper):
             stream_title =  stream_tags.get('title').lower()
         
 #       If language is 'und' or blank use default language IF set
-        if stream_lang == 'und' or stream_lang == ''
+        if stream_lang == 'und' or stream_lang == '':
             stream_lang = default_language
 
         if len(stream_lang) == 2:
@@ -187,12 +187,12 @@ class PluginStreamMapper(StreamMapper):
                     language = babelfish.Language.fromalpha3t(stream_lang)
                 except:
                     try:
-                         = babelfish.Language.fromopensubtitles(stream_lang)
+                        language = babelfish.Language.fromopensubtitles(stream_lang)
                     except:
                         language = ''
         else:
             language = ''
-        
+
         if language:
             # Use ISO-639-1 2-letter format.        (example: en,  fr,  pt,  de,  nl,  zh,  el)
             if language_code == '1':
@@ -216,17 +216,17 @@ class PluginStreamMapper(StreamMapper):
                         region_tag = 'US'
                     elif ( 'united' in stream_title and 'kingdom' in stream_title ) or ( 'great' in stream_title and 'britain' in stream_title ) or 'uk' in stream_title:
                         region_tag = 'GB'
-                    elif 'australia' in stream_title
+                    elif 'australia' in stream_title:
                         region_tag = 'AU'
-                    elif 'canad' in stream_title
+                    elif 'canad' in stream_title:
                         region_tag = 'CA'
-                    elif 'zealand' in stream_title
+                    elif 'zealand' in stream_title:
                         region_tag = 'NZ'
                     
                 elif language == 'fr':                                      # FRENCH
                     if 'canad' in stream_title or 'quebec' in stream_title or 'québéc' in stream_title:
                         region_tag = 'CA'
-                    elif 'belgi' in stream_title
+                    elif 'belgi' in stream_title:
                         region_tag = 'BE'
 
                 elif language == 'pt':                                      # PORTUGUESE
@@ -257,11 +257,11 @@ class PluginStreamMapper(StreamMapper):
         
         if language_tag:
             subtitle_tag = "{}.{}".format(subtitle_tag, language_tag)
-            if region_tag
+            if region_tag:
                 subtitle_tag = "{}.{}".format(subtitle_tag, region_tag)
             if sdh_tag:
                 subtitle_tag = "{}.{}".format(subtitle_tag, sdh_tag)
-            if forced_tag"
+            if forced_tag:
                 subtitle_tag = "{}.{}".format(subtitle_tag, forced_tag)
            
         else:
