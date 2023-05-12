@@ -31,13 +31,11 @@ from extract_srt_subtitles_with_iso.lib.ffmpeg import StreamMapper, Probe, Parse
 # Configure plugin logger
 logger = logging.getLogger("Unmanic.Plugin.extract_srt_subtitles_with_iso")
 
-subtitles_to_remove = []
-
 class Settings(PluginSettings):
     settings = {
         "language_code":        '1',
-        "use_sdh_extension":    '',
-        "use_forced_extension": '',
+        "use_sdh_extension":    'sdh',
+        "use_forced_extension": 'forced',
         "default_language":     'en',
         "use_title_failback":   True,
         "use_regional":         True,
@@ -151,6 +149,7 @@ class PluginStreamMapper(StreamMapper):
         stream_tags = stream_info.get('tags', {})
 
         language_tag = ''
+        region_tag   = ''
         sdh_tag      = ''
         forced_tag   = ''
         stream_lang  = ''
@@ -169,6 +168,8 @@ class PluginStreamMapper(StreamMapper):
             stream_lang = stream_tags.get('language').lower()
         if stream_tags.get('title'):
             stream_title =  stream_tags.get('title').lower()
+
+        logger.debug("Processing Track: '{}'. Lang: {}. Title: {}".format(stream_info.get('index'), stream_lang, stream_title ))
         
 #       If language is 'und' or blank use default language IF set
         if stream_lang == 'und' or stream_lang == '':
@@ -241,6 +242,7 @@ class PluginStreamMapper(StreamMapper):
                             language_tag = 'ea'
                         elif latin_spanish == '2':   # Use '.es-419' extension For Latin American Spanish
                             region_tag = '419'
+        
         elif stream_lang:
             language_tag = stream_lang
 
@@ -258,7 +260,7 @@ class PluginStreamMapper(StreamMapper):
         if language_tag:
             subtitle_tag = "{}.{}".format(subtitle_tag, language_tag)
             if region_tag:
-                subtitle_tag = "{}.{}".format(subtitle_tag, region_tag)
+                subtitle_tag = "{}-{}".format(subtitle_tag, region_tag)
             if sdh_tag:
                 subtitle_tag = "{}.{}".format(subtitle_tag, sdh_tag)
             if forced_tag:
