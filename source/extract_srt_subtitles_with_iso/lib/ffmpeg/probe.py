@@ -149,31 +149,6 @@ class Probe(object):
 
         return True
 
-    @staticmethod
-    def init_probe(data, logger, allowed_mimetypes=None):
-        """
-        Fetch the Probe object given a plugin's data object
-
-        :param data:
-        :param logger:
-        :param allowed_mimetypes:
-        :return:
-        """
-        probe = Probe(logger, allowed_mimetypes=allowed_mimetypes)
-        if 'ffprobe' in data.get('shared_info', {}):
-            if not probe.set_probe(data.get('shared_info', {}).get('ffprobe')):
-                # Failed to set ffprobe from shared info.
-                # Probably due to it being for an incompatible mimetype declared above
-                return
-        elif not probe.file(data.get('path')):
-            # File probe failed, skip the rest of this test
-            return
-        # Set file probe to shared infor for subsequent file test runners
-        if 'shared_info' in data:
-            data['shared_info'] = {}
-        data['shared_info']['ffprobe'] = probe.get_probe()
-        return probe
-
     def file(self, file_path):
         """
         Sets the 'probe' dict by probing the given file path.
