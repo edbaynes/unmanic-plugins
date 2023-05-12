@@ -22,6 +22,7 @@
 import logging
 import os
 import re
+import babelfish
 
 from unmanic.libs.unplugins.settings import PluginSettings
 
@@ -34,12 +35,13 @@ subtitles_to_remove = []
 
 class Settings(PluginSettings):
     settings = {
-        "language_code":        '2',
-        "sdh_extension":        '',
-        "forced_subtitle":      '',
+        "language_code":        '1',
+        "use_sdh_extension":    '',
+        "use_forced_extension": '',
         "default_language":     'en',
-        "failback_title":       True,
+        "use_title_failback":   True,
         "use_regional":         True,
+        "latin_spanish":        '1',
     }
 
     def __init__(self, *args, **kwargs):
@@ -49,17 +51,25 @@ class Settings(PluginSettings):
                 "input_type":     "select",
                 "select_options": [
                     {
+                        "value": '1',
+                        "label": "Use ISO-639-1 2-letter format.        (example: en,  fr,  pt,  de,  nl,  zh,  el)",
+                    },
+                    {
                         "value": '2',
-                        "label": "ISO-639-1:    Use 2-letter format.    (example: en, fr, pt)",
+                        "label": "Use ISO-639-2/B 3-letter format.      (example: eng, fre, por, ger, dut, chi, gre)",
                     },
                     {
                         "value": '3',
-                        "label": "ISO-639-2/B:  Use 3-letter format.    (example: eng, fre, por)",
+                        "label": "Use ISO-639-2/T 3-letter format.      (example: eng, fra, por, deu, nld, zho, ell)",
+                    },
+                    {
+                        "value": '4',
+                        "label": "Use OpenSubtitles 3-letter format.    (example: eng, fre, por, ger, dut, chi, ell)",
                     },
                 ],
                 "label":          "Language Code extension format",
             },
-            "sdh_extension": {
+            "use_sdh_extension": {
                 "input_type":     "select",
                 "select_options": [
                     {
@@ -81,7 +91,7 @@ class Settings(PluginSettings):
                 ],
                 "label":          "Hearing-impaired subtitles extension. (To be added after Language Code)",
             },
-            "forced_subtitle": {
+            "use_forced_extension": {
                 "input_type":     "select",
                 "select_options": [
                     {
@@ -98,11 +108,25 @@ class Settings(PluginSettings):
             "default_language": {
                 "label":          "Specify a sufix for subtitle tracks with no language or unknown language to be tagged with. Leave empty to disable.",
             },
-            "failback_title": {
+            "use_title_failback": {
                 "label":          "Use Subtitle description if no language information exists",
             },
             "use_regional": {
-                "label":          "Try defining regional coding from Subtitle description. (For exemple: 'pt-BR' for Brazilian Portuguese or 'fr-CA' for Canadian French)",
+                "label":          "Try defining Region Subtag from Subtitle description. (For exemple: 'pt-BR' for Brazilian Portuguese or 'fr-CA' for Canadian French)",
+            },
+            "latin_spanish": {
+                "input_type":     "select",
+                "select_options": [
+                    {
+                        "value": '1',
+                        "label": "Use '.ea' extension For Latin American Spanish",
+                    },
+                    {
+                        "value": '2',
+                        "label": "Use '.es-419' extension For Latin American Spanish",
+                    },
+                ],
+                "label":          "Latin American Spanish prefered extension (Region Subtag must be selected)",
             }
         }
 
@@ -127,113 +151,123 @@ class PluginStreamMapper(StreamMapper):
         stream_tags = stream_info.get('tags', {})
 
         language_tag = ''
-        hearing_imp  = ''
+        sdh_tag      = ''
+        forced_tag   = ''
         stream_lang  = ''
         stream_title = ''
 
 #       Get Plugin Settings
-        languageCode       = self.settings.get_setting('language_code')
-        sdhExtension       = self.settings.get_setting('sdh_extension')
-        forcedSubtitle     = self.settings.get_setting('forced_subtitle')
-        defaultLanguage    = self.settings.get_setting('default_language')
-        failbackTitle      = self.settings.get_setting('failback_title')
-        useRegional        = self.settings.get_setting('use_regional')
+        language_code           = self.settings.get_setting('language_code')
+        use_sdh_extension       = self.settings.get_setting('use_sdh_extension')
+        use_forced_extension    = self.settings.get_setting('use_forced_extension')
+        default_language        = self.settings.get_setting('default_language')
+        use_title_failback      = self.settings.get_setting('use_title_failback')
+        use_regional            = self.settings.get_setting('use_regional')
+        latin_spanish           = self.settings.get_setting('latin_spanish')
 
         if stream_tags.get('language'):
             stream_lang = stream_tags.get('language').lower()
         if stream_tags.get('title'):
             stream_title =  stream_tags.get('title').lower()
         
-#       If language is 'und' it shouldn't be considered for the naming logic
-        if stream_lang == 'und':
-            stream_lang = ''
+#       If language is 'und' or blank use default language IF set
+        if stream_lang == 'und' or stream_lang == ''
+            stream_lang = default_language
 
-        if languageCode == '3':            
-            if stream_lang:
-                language_tag = stream_lang
-#           TODO: In case language tag is initial, try to find the language using Fuzzy Search
-#            else
+        if len(stream_lang) == 2:
+            try:
+                language = babelfish.Language.fromalpha2(stream_lang)
+            except:
+                language = ''
+        elif len(stream_lang) == 3:  
+            try:
+                language = babelfish.Language.fromalpha3b(stream_lang)
+            except:
+                try:
+                    language = babelfish.Language.fromalpha3t(stream_lang)
+                except:
+                    try:
+                         = babelfish.Language.fromopensubtitles(stream_lang)
+                    except:
+                        language = ''
+        else:
+            language = ''
+        
+        if language:
+            # Use ISO-639-1 2-letter format.        (example: en,  fr,  pt,  de,  nl,  zh,  el)
+            if language_code == '1':
+                language_tag = language.alpha2
 
-        elif languageCode == '2':
-#           TODO: Replace Logic using PyCountry package methods
-            
-            if stream_lang == 'eng':  # ENGLISH
-                language_tag = 'en'
-                if useRegional:
+            # Use ISO-639-2/B 3-letter format.      (example: eng, fre, por, ger, dut, chi, gre)
+            elif language_code == '2':
+                language_tag = language.alpha3b
+
+            # Use ISO-639-2/T 3-letter format.      (example: eng, fra, por, deu, nld, zho, ell)
+            elif language_code == '3':
+                language_tag = language.alpha3
+
+            # Use OpenSubtitles 3-letter format.    (example: eng, fre, por, ger, dut, chi, ell)
+            elif language_code == '4':
+                language_tag = language.opensubtitles
+
+            if use_regional:
+                if language == 'en':                                        # ENGLISH
                     if ( 'united' in stream_title and 'states' in stream_title ) or 'usa' in stream_title or 'america' in stream_title:
-                        language_tag = 'en-US'
+                        region_tag = 'US'
                     elif ( 'united' in stream_title and 'kingdom' in stream_title ) or ( 'great' in stream_title and 'britain' in stream_title ) or 'uk' in stream_title:
-                        language_tag = 'en-GB'
-
-            elif stream_lang == 'fre':  # FRENCH
-                language_tag = 'fr'
-                if useRegional:
+                        region_tag = 'GB'
+                    elif 'australia' in stream_title
+                        region_tag = 'AU'
+                    elif 'canad' in stream_title
+                        region_tag = 'CA'
+                    elif 'zealand' in stream_title
+                        region_tag = 'NZ'
+                    
+                elif language == 'fr':                                      # FRENCH
                     if 'canad' in stream_title or 'quebec' in stream_title or 'québéc' in stream_title:
-                        language_tag = 'fr-CA'
+                        region_tag = 'CA'
+                    elif 'belgi' in stream_title
+                        region_tag = 'BE'
 
-            elif stream_lang == 'spa':  # SPANISH
-                language_tag = 'es'
-                if useRegional:
-                    if 'latin' in stream_title or 'america' in stream_title:
-                        language_tag = 'ea'
-                    if 'mexic' in stream_title or 'méxic' in stream_title:
-                        language_tag = 'es-MX'
-
-            elif stream_lang == 'por':  # PORTUGUESE
-                language_tag = 'pt'
-                if useRegional:
+                elif language == 'pt':                                      # PORTUGUESE
                     if 'brazil' in stream_title or 'brasil' in stream_title:
-                        language_tag = 'pt-BR'      
+                        region_tag = 'BR'
 
-            elif stream_lang == 'jpn':  # JAPANESE
-                language_tag = 'ja'
-            elif stream_lang == 'dan':  # DANISH
-                language_tag = 'da'
-            elif stream_lang == 'ger':  # GERMAN
-                language_tag = 'de'
-            elif stream_lang == 'ita':  # ITALIAN
-                language_tag = 'it'
-            elif stream_lang == 'dut':  # DUTCH
-                language_tag = 'nl'
-            elif stream_lang == 'nor':  # NORWEGIAN
-                language_tag = 'no'
-            elif stream_lang == 'fin':  # FINNISH 
-                language_tag = 'fi'
-            elif stream_lang == 'swe':  # SWEDISH
-                language_tag = 'sv'
-            elif stream_lang == 'ukr':  # UKRAINIAN
-                language_tag = 'uk'
-            elif stream_lang == 'rus':  # RUSSIAN
-                language_tag = 'ru'
+                elif language == 'es':                                      # SPANISH
+                    if 'mexic' in stream_title or 'méxic' in stream_title:
+                        region_tag = 'MX'
+                    if 'latin' in stream_title or 'america' in stream_title:
+                        if latin_spanish == '1':     # Use '.ea' extension For Latin American Spanish
+                            language_tag = 'ea'
+                        elif latin_spanish == '2':   # Use '.es-419' extension For Latin American Spanish
+                            region_tag = '419'
+        elif stream_lang:
+            language_tag = stream_lang
 
 #       Check if the user selected a SDH extension
-        if sdhExtension:
+        if use_sdh_extension:
             # Check the title for Hearing Impared or SDH or CC information            
             if 'sdh' in stream_title or 'cc' in stream_title or 'hi' in stream_title:
-                hearing_imp = sdhExtension
+                sdh_tag = use_sdh_extension
+
+#       Check if the user selected a Forced extension
+        if use_forced_extension:
+            if 'force' in stream_title:
+                forced_tag = use_forced_extension                
         
         if language_tag:
             subtitle_tag = "{}.{}".format(subtitle_tag, language_tag)
-            if hearing_imp:
-                subtitle_tag = "{}.{}".format(subtitle_tag, hearing_imp)
-#           Check if the user selected a Forced extension
-            elif 'force' in stream_title and forcedSubtitle:
-                subtitle_tag = "{}.{}".format(subtitle_tag, forcedSubtitle)
+            if region_tag
+                subtitle_tag = "{}.{}".format(subtitle_tag, region_tag)
+            if sdh_tag:
+                subtitle_tag = "{}.{}".format(subtitle_tag, sdh_tag)
+            if forced_tag"
+                subtitle_tag = "{}.{}".format(subtitle_tag, forced_tag)
+           
         else:
-#           If user choose to use Description to streams without language information
-            if failbackTitle and stream_title:
+#           If user choose to use Stream Description for tracks without a language
+            if use_title_failback and stream_title:
                 subtitle_tag = "{}.{}".format(subtitle_tag, stream_tags.get('title'))
-
-#           If there's no Language Tag on the stream and the user specified something on the Settings                
-            if defaultLanguage:
-                subtitle_tag = "{}.{}".format(subtitle_tag, defaultLanguage)        
-
-        '''
-        if stream_tags.get('language'):
-            subtitle_tag = "{}.{}".format(subtitle_tag, stream_tags.get('language'))
-        if stream_tags.get('title'):
-            subtitle_tag = "{}.{}".format(subtitle_tag, stream_tags.get('title'))
-        '''
 
         # If there were no tags, just number the file
         if not subtitle_tag:
